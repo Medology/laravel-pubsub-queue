@@ -23,7 +23,7 @@ class PubSubQueueTests extends TestCase
 
     public function setUp()
     {
-        $this->result = ['message-id'];
+        $this->result = 'message-id';
 
         $this->topic = $this->createMock(Topic::class);
         $this->client = $this->createMock(PubSubClient::class);
@@ -39,6 +39,7 @@ class PubSubQueueTests extends TestCase
                 'subscription',
                 'availableAt',
                 'subscribeToTopic',
+                'getSubscriberName',
             ])->getMock();
     }
 
@@ -81,7 +82,9 @@ class PubSubQueueTests extends TestCase
         $queue->method('subscribeToTopic')
             ->willReturn($this->subscription);
 
-        $this->assertEquals($this->result, $queue->pushRaw('test'));
+        $payload = base64_encode(json_encode(['id' => $this->result]));
+
+        $this->assertEquals($this->result, $queue->pushRaw($payload));
     }
 
     public function testLater()
@@ -202,8 +205,14 @@ class PubSubQueueTests extends TestCase
         $this->queue->method('getTopic')
             ->willReturn($this->topic);
 
+        $this->queue->method('getSubscriberName')
+            ->willReturn('subscriber');
+
         $this->queue->method('availableAt')
             ->willReturn($delay_timestamp);
+
+        $this->topic->method('subscription')
+            ->willReturn($this->subscription);
 
         $this->topic->expects($this->once())
             ->method('publish')
@@ -302,7 +311,23 @@ class PubSubQueueTests extends TestCase
 
     public function testGetSubscriberName()
     {
-        $this->assertTrue(is_string($this->queue->getSubscriberName()));
+        $queue = $this->getMockBuilder(PubSubQueue::class)
+            ->setConstructorArgs([$this->client, 'default'])
+            ->setMethods()
+            ->getMock();
+        $this->assertTrue(is_string($queue->getSubscriberName()));
+        return $queue;
+    }
+
+    /**
+     * @depends testGetSubscriberName
+     * @param PubSubQueue $queue
+     */
+    public function testSetSubscriberName(PubSubQueue $queue)
+    {
+        $subscriberName = 'test-subscriber';
+        $queue->setSubscriberName($subscriberName);
+        $this->assertEquals($subscriberName, $queue->getSubscriberName());
     }
 
     public function testGetPubSub()
